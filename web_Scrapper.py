@@ -3,13 +3,23 @@ import xlsxwriter
 from time import sleep
 
 from selenium import webdriver
+import selenium.webdriver.support.ui as ui
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import ElementClickInterceptedException
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
 
 from secrets import username, password
 
-driver = webdriver.Chrome()
+options = webdriver.ChromeOptions()
+options.add_argument("--no-sandbox")
+options.add_argument("--disable-dev-shm-usage")
+options.add_argument("--window-size=1920,1080")
+driver = webdriver.Chrome(options=options)
+
 driver.maximize_window()
 ####Login Process####
 driver.get("https://angel.co/login")
@@ -25,11 +35,20 @@ login_btn.click()
 
 driver.get("https://angel.co/jobs")
 
-### Waiting to set search conditions, press 'esc' to continue
+### Waiting to set search conditions, press 'esc' to continue and sleep for 5 seconds###
 keyboard.wait('esc')
+sleep(3)
 ############################################################
+try:
+    no_of_results = driver.find_element_by_xpath("/html/body/div[1]/div/div/div[5]/div[2]/div/div/div[4]/h4")
+except:
+    sleep(3)
+    try:
+        no_of_results = driver.find_element_by_xpath("/html/body/div[1]/div/div/div[5]/div[2]/div/div/div[4]/h4")
+    except NoSuchElementException:
+        print("Try pressing esc after results load")
 
-no_of_results = driver.find_element_by_xpath("/html/body/div[1]/div/div/div[5]/div[2]/div/div/div[4]/h4")
+
 print(no_of_results.text)
 output = no_of_results.text
 
@@ -42,7 +61,8 @@ workbook = xlsxwriter.Workbook('jobs_description.xlsx')
 worksheet = workbook.add_worksheet()
 row = 1
 col = 0
-
+#opening_file/creating new file
+file = open("job_requirements.txt", "a+", errors='ignore')
     ###############Inintialize Excel Sheet##########################
 try:
     worksheet.write(0, 0, "company_name")
@@ -53,6 +73,8 @@ try:
     worksheet.write(0, 5, "visa_sponsorship")
     worksheet.write(0, 6, "experience")
     worksheet.write(0, 7, "skills")
+    worksheet.write(0, 8, "link")
+    #worksheet.write(0, 9, "responsibilities")
     #########################################
     limit = 5+no_of_jobs
     counter = 0
@@ -63,31 +85,50 @@ try:
         end   = "]/div[2]/div/div[2]/button"
         path = front+str(x)+end
 
+        xpath_begin = "/html/body/div[1]/div/div/div[5]/div[2]/div/div/div["
+        xpath_end = "]/div[2]/div/div[1]/a"
+        xpath_url = xpath_begin+str(x)+xpath_end
         ############################
         actions = ActionChains(driver)
         target = driver.find_element_by_xpath(path)
+        link = driver.find_element_by_xpath(xpath_url).get_attribute("href")
+
         actions.move_to_element(target)
         #############################
-        test = driver.find_element_by_xpath(path)
-        #sleep(10)
+        apply = driver.find_element_by_xpath(path)
         try:
-            test.click()
-        except ElementClickInterceptedException:
-                driver.execute_script("window.scrollTo(0,(%d*100);"%counter)
-                try:
-                    test.click()
-                except ElementClickInterceptedException:
-                    workbook.close()
-
-        sleep(5)
-
-        try:
-            company_name = driver.find_element_by_css_selector(".\__halo_fontSizeMap_size--xl").text
+            apply.click()
         except NoSuchElementException:
+            driver.execute_script("window.scrollTo(0,(%d*200));"%counter)
             try:
-                company_name = driver.find_element_by_xpath("/html/body/div[4]/div/div/div/div/div[1]/div[2]/h3").text
+                apply.click()
             except NoSuchElementException:
-                company_name = driver.find_element_by_xpath("/html/body/div[3]/div/div/div/div/div[1]/div[2]/h3").text
+                print("Uncaught exceptions")
+                apply[counter-1].click()
+        except ElementClickInterceptedException:
+            driver.execute_script("window.scrollTo(0,(%d*250));"%counter)
+            apply.click()
+
+        sleep(2)
+
+        try:
+            company_name = driver.find_element_by_xpath("//*[@class='__halo_fontSizeMap_size--xl __halo_fontWeight_medium styles_component__1kg4S startupName_c5f67']").text
+        except NoSuchElementException:
+            sleep(10)
+            try:
+                company_name = driver.find_element_by_xpath("//*[@class='__halo_fontSizeMap_size--xl __halo_fontWeight_medium styles_component__1kg4S startupName_c5f67']").text
+            except NoSuchElementException:
+                print("Webpage is not loading")
+                try:
+                    sleep(10)
+                    company_name = driver.find_element_by_xpath("//*[@class='__halo_fontSizeMap_size--xl __halo_fontWeight_medium styles_component__1kg4S startupName_c5f67']").text
+                except NoSuchElementException:
+                    print("Webpage is not loading")
+                    try:
+                        sleep(10)
+                        company_name = driver.find_element_by_xpath("//*[@class='__halo_fontSizeMap_size--xl __halo_fontWeight_medium styles_component__1kg4S startupName_c5f67']").text
+                    except NoSuchElementException:
+                        print("Webpage is not loading")
 
         try:
             job_description = driver.find_element_by_css_selector(".\__halo_fontSizeMap_size--lg").text
@@ -117,27 +158,45 @@ try:
             skills = driver.find_element_by_css_selector(".characteristic_650ae:nth-child(5) > dd").text
         except NoSuchElementException:
             skills = "None"
+        ####################################################################################################################
 
-
-
-
-    ####################################################################################################################
+        cancel = driver.find_element_by_xpath("//*[@class='styles_component__3A0_k styles_alternate__2u_Hm styles_regular__3b1-C component_21dbe']")
 
         try:
-            cancel = driver.find_element_by_xpath("/html/body/div[4]/div/div/div/div/div[2]/div[6]/button[1]")
-        except NoSuchElementException:
+            cancel.click()
+        except:
+            driver.execute_script("return arguments[0].scrollIntoView();",cancel)
             try:
-                cancel  =  driver.find_element_by_xpath("/html/body/div[10]/div/div/div/div/div[2]/div[6]/button[1]")
-            except NoSuchElementException:
-                try:
-                    cancel  = driver.find_element_by_xpath("/html/body/div[6]/div/div/div/div/div[2]/div[6]/button[1]")
-                except NoSuchElementException:
-                    try:
-                        cancel  =  driver.find_element_by_xpath("/html/body/div[3]/div/div/div/div/div[2]/div[6]/button[1]")
-                    except NoSuchElementException:
-                        cancel = driver.find_element_by_xpath("/html/body/div[7]/div/div/div/div/div[2]/div[6]/button[1]")
-        cancel.click()
-        ######################################################
+                cancel.click()
+            except:
+                raise KeyboardInterrupt
+
+        #####################Get_Job_Information#################################
+        main_window = driver.current_window_handle
+
+        driver.execute_script("window.open('');")
+        driver.switch_to.window(driver.window_handles[1])
+        driver.get(link)
+        try:
+            responsibilities = driver.find_element_by_xpath("//*[@class='description_c90c4']").text
+        except:
+            sleep(5)
+            try:
+                responsibilities = driver.find_element_by_xpath("//*[@class='description_c90c4']").text
+            except:
+                sleep(10)
+            try:
+                responsibilities = driver.find_element_by_xpath("//*[@class='description_c90c4']").text
+            except:
+                sleep(5)
+
+
+
+
+        driver.close()
+        driver.switch_to.window(driver.window_handles[0])
+
+
         worksheet.write(row, col, company_name)
         worksheet.write(row, col+1, job_description)
         worksheet.write(row, col+2, compensation)
@@ -146,8 +205,20 @@ try:
         worksheet.write(row, col+5, visa_sponsorship)
         worksheet.write(row, col+6, experience)
         worksheet.write(row, col+7, skills)
+        worksheet.write(row, col+8, link)
+        #worksheet.write(row, col+9, responsibilities)
         row+=1
+        ###################Writing_the_description_to_file######################
+        file.write("\n\n%d->%s\n%s\n%s"%(counter, company_name, job_description, responsibilities))
 
+
+
+    file.close()
+    workbook.close()
+
+except KeyboardInterrupt:
+    file.close()
     workbook.close()
 except:
+    file.close()
     workbook.close()
